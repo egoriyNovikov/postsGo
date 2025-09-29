@@ -23,20 +23,16 @@ func Router(db *sql.DB, port string) {
 		case http.MethodPost:
 			userController.CreateUser(w, r)
 		case http.MethodGet:
-			middleware.AuthMiddleware(userController.GetAllUsers)(w, r)
+			id := r.URL.Query().Get("id")
+			if id != "" {
+				middleware.AuthMiddleware(userController.GetUser)(w, r)
+			} else {
+				middleware.AuthMiddleware(userController.GetAllUsers)(w, r)
+			}
 		case http.MethodPut:
 			middleware.AuthMiddleware(userController.UpdateUser)(w, r)
 		case http.MethodDelete:
 			middleware.AuthMiddleware(userController.DeleteUser)(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
-	http.HandleFunc("/api/users/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			middleware.AuthMiddleware(userController.GetUser)(w, r)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
