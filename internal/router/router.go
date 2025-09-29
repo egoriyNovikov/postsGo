@@ -10,23 +10,14 @@ import (
 )
 
 func Router(db *sql.DB, port string) {
-	// Создаем сервисы
 	userService := service.NewUserService(db)
 
-	// Создаем контроллеры
 	userController := handlers.NewUserController(userService)
 	authController := handlers.NewAuthController(db)
 
-	// Регистрируем маршруты
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
-	})
-
-	// Маршруты аутентификации
 	http.HandleFunc("/api/auth/login", authController.Login)
 	http.HandleFunc("/api/auth/logout", middleware.RefreshTokenMiddleware(authController.Logout))
 
-	// API маршруты для пользователей
 	http.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
