@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/egoriyNovikov/internal/models"
 	"github.com/egoriyNovikov/internal/service"
+	"github.com/egoriyNovikov/pkg"
 )
 
 type UserController struct {
@@ -27,14 +29,23 @@ func (c *UserController) CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	hashedPassword, err := pkg.HashPassword(user.Password)
+	if err != nil {
+		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		return
+	}
+	user.Password = hashedPassword
 
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
 	if err := c.userService.CreateUser(&user); err != nil {
+		log.Printf("Error creating user: %v", err)
 		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}
+
+	user.Password = ""
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -55,6 +66,8 @@ func (c *UserController) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user.Password = ""
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
 }
@@ -70,14 +83,70 @@ func (c *UserController) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
+		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 		if err != nil {
 			http.Error(w, "Failed to scan user", http.StatusInternalServerError)
 			return
 		}
+		user.Password = ""
 		users = append(users, user)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
+}
+
+func (c *UserController) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	var user models.User
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Если передан новый пароль, хешируем его
+	if user.Password != "" {
+		hashedPassword, err := pkg.HashPassword(user.Password)
+		if err != nil {
+			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+			return
+		}
+		user.Password = hashedPassword
+	}
+
+	user.UpdatedAt = time.Now()
+
+	if err := c.userService.UpdateUser(id, &user); err != nil {
+		log.Printf("Error updating user: %v", err)
+		http.Error(w, "Failed to update user", http.StatusInternalServerError)
+		return
+	}
+
+	user.Password = ""
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+func (c *UserController) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.userService.DeleteUser(id); err != nil {
+		log.Printf("Error deleting user: %v", err)
+		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted successfully"})
 }
