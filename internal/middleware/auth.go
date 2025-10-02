@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/egoriyNovikov/pkg"
@@ -29,13 +30,12 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		r.Header.Set("User-ID", string(rune(claims.UserID)))
+		r.Header.Set("User-ID", strconv.Itoa(claims.UserID))
 		r.Header.Set("Username", claims.Username)
 
 		next(w, r)
 	}
 }
-
 
 func RefreshTokenMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

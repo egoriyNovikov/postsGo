@@ -11,8 +11,10 @@ import (
 
 func Router(db *sql.DB, port string) {
 	userService := service.NewUserService(db)
+	postService := service.NewPostService(db)
 
 	userController := handlers.NewUserController(userService)
+	postController := handlers.NewPostController(postService)
 	authController := handlers.NewAuthController(db)
 
 	http.HandleFunc("/api/auth/login", authController.Login)
@@ -33,6 +35,38 @@ func Router(db *sql.DB, port string) {
 			middleware.AuthMiddleware(userController.UpdateUser)(w, r)
 		case http.MethodDelete:
 			middleware.AuthMiddleware(userController.DeleteUser)(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	http.HandleFunc("/api/posts", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			middleware.AuthMiddleware(postController.CreatePost)(w, r)
+		case http.MethodGet:
+			// Проверяем, есть ли параметр id в запросе
+			id := r.URL.Query().Get("id")
+			if id != "" {
+				// Если есть id, получаем конкретный пост
+				middleware.AuthMiddleware(postController.GetPost)(w, r)
+			} else {
+				// Если нет id, получаем все посты
+				middleware.AuthMiddleware(postController.GetAllPosts)(w, r)
+			}
+		case http.MethodPut:
+			middleware.AuthMiddleware(postController.UpdatePost)(w, r)
+		case http.MethodDelete:
+			middleware.AuthMiddleware(postController.DeletePost)(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	http.HandleFunc("/api/posts/my", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			middleware.AuthMiddleware(postController.GetUserPosts)(w, r)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
